@@ -78,6 +78,9 @@ void setting();
 void PI_Motor() ;
 double Get_headingDiff(double Input, double Setpoint);
 double PI_Controller(double error);
+void Lqg_Motor();
+double LQG_Controller(double error);
+
 double integral=0;
 readcompass R_compass;  //DECLARING A CLASS I.E. R_compass is object of type readcompass
 int Azmuth_num;         // A GLOBAL VARIABLE
