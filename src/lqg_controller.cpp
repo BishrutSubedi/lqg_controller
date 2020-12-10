@@ -37,6 +37,7 @@ double Kep = 1.7321;
 double Kef = 1;
 double J = 2;
 
+// Set parameters for PI controller
 double kp=2.1;  // THIS VALUE IS HERE TO ROTATE THE MOTOR ONLY, NOT FROM ESTIMATION
 double ki=2.6;  // FOR ROTATION, KI GAIN, NOTHING TO DO WITH ESTIMATION
 
@@ -49,8 +50,6 @@ steady_clock::time_point t4 = steady_clock::now();
 steady_clock::time_point t3 = steady_clock::now();
 
 steady_clock::time_point time_end,LQG_lastTime,now;
-steady_clock::time_point rtime_end,rnow,r_lastTime, com_sent_time;
-steady_clock::time_point pre_Azmuth_time =steady_clock::now();
 
 // initial heading*******************************
 double offsetTol = 4;
@@ -66,15 +65,12 @@ double offsetTol = 4;
 //int Azmuth[] ={ 135,85,140,90,170,125,195,155,210,165,205,150,200,135,180,125,170,110,165,100,155,85,140,80,135,70,115};//exp7
 
 //Experiment for only one
-int Azmuth[] ={165}; //exp4
+int Azmuth[] = {165} ; //exp4
+int flag_LQG_motor = 1;
 
-//int Azmuth[] ={ 125,185,130,215,130,75,145,95,160,170};//exp1
-//int Azmuth[] ={ 145,60,155,230,170,225,150,80,140,65,135};//exp2
-//int Azmuth[] ={145,60,155,230,170};//exp3
+int Azmuth_index = 0;  // IS A GLOBAL VARIABLE
 
-//int Azmuth[] ={ 165,80,155,80,160,95,190,120,200,145,225,165,255,185,255,175,235};//exp1_songwei
-
-int Azmuth_index=0;  // IS A GLOBAL VARIABLE
+int Azmuth_single = 165; // single Azmuth for LQG test
 //***********************************************
 
 void setting();     
@@ -87,23 +83,22 @@ readcompass R_compass;  //DECLARING A CLASS I.E. R_compass is object of type rea
 int Azmuth_num;         // A GLOBAL VARIABLE
 //*********************************************
 
-// CREATING STRUCTURE WITH 3 FIELDS,  time, pwm and value heading to write to data files
-struct DATA{          
+ // A GLOBAL VARIABLE
 
-	double during_time;     //TIME STAMP 
-  int value_pwm;
-  float value_heading;
-
-};
-
-DATA data[10000];   // CREATE ARRAY OF STRUCTURES, I.E. 10000
-
-int data_index=0;   // A GLOBAL VARIABLE
-
+ros::Publisher com_pub; //compass publisher
+ros::Publisher baro_pub; // baro_publisher
 ros::Publisher ros_serial;
 ros::Publisher pwm_pub;
+
 ros::Subscriber remote_rssi;
+ros::Subscriber local_gps_sub; //
+ros::Subscriber remoter_gps_sub;
+ros::Subscriber new_Azimuth;
+ros::Subscriber Enable_GPS_Azimuth;
+
 std_msgs::Int16   pwm_msg;
+std_msgs::Float64 com_msg;
+std_msgs::String  serial_msg;
 
 
 int main(int argc, char **argv)
@@ -116,14 +111,15 @@ int main(int argc, char **argv)
 	setting();
 
   Azmuth_num=sizeof(Azmuth)/sizeof(Azmuth[0]); 
-	cout<<Azmuth_num<<endl;
+	cout << Azmuth_num << endl;
 	
 	sleep(2);
 
   cout<< "time_count" << "," << "Output_pwm" <<" ,"<< "raw_angle" <<" ," << "target_angle" << endl; //printing to screen as well
 
-	while (Azmuth_index < Azmuth_num)     //NOTE: THIS LOOP ONLY EXITS AFTER ALL ANGLE TARGET REACHED AND DO NOT WRITE ANYTHING AS WRITING IS AFTER WHILE LOOP FINISHES.
-	{
+	//while (Azmuth_index < Azmuth_num)     //NOTE: THIS LOOP ONLY EXITS AFTER ALL ANGLE TARGET REACHED AND DO NOT WRITE ANYTHING AS WRITING IS AFTER WHILE LOOP FINISHES.
+	while(1)
+  {
     Lqg_Motor();
 		//PI_Motor();  //Azmuth index is incremented in PI_Motor() // fills global variable
 
@@ -192,11 +188,6 @@ void PI_Motor()   //motor control
 
         }
         t1 = steady_clock::now();
-        data[data_index].during_time=time_span.count();
-        data[data_index].value_pwm=Output;
-        data[data_index].value_heading=Input;       // THIS IS THE COMPASS READING, BETTER TO CALL R_compass.c_heading() for raw
-        data_index++;
-
     }
   }
 
@@ -246,27 +237,15 @@ void Lqg_Motor()   //motor control
 
     if (duration_cast<duration<double>>(steady_clock::now()- LQG_lastTime).count()>0.02 ) //decide the loop time 50 hz
     {
-      float headingRaw =R_compass.c_heading();   //Get current compass
-
-		  // subscribe com
-      //***************
-      //**publish compass heading
-      //***************
-      if(duration_cast<duration<double>>(steady_clock::now()- com_sent_time).count()>0.1)
-      {
-    	  com_sent_time=steady_clock::now();
-		    com_msg.data=headingRaw;
-    	  com_pub.publish(com_msg);
-      }
-      //**************************
+      float headingRaw = R_compass.c_heading();   //Get current compass
 
       float targetHeading;
 
       //judge if running LQG
       //***************
-      if(flag_LQG_motor==1)
+      if(flag_LQG_motor == 1)
       {
-    	  targetHeading = Azmuth;
+    	  targetHeading = Azmuth_single;
       }
       else
       {
@@ -277,20 +256,26 @@ void Lqg_Motor()   //motor control
       Input = headingRaw;
       Setpoint = targetHeading;
 
-      float headingDiff = Get_headingDiff(Input, Setpoint);// get the small difference between the current heading and desired heading
+      float headingDiff = Get_headingDiff(Input, Setpoint); // get the small difference between the current heading and desired heading
 
       //if heading difference is less than offsettol, the motor will keep quite.
       if (abs(headingDiff) < offsetTol){
     	  pwm_msg.data=0;
     	  pwm_pub.publish(pwm_msg);
-        }
-       else
-       {
-        Output = LQG_Controller(headingDiff);
-		   pwm_msg.data=-Output;
-		   pwm_pub.publish(pwm_msg);
+
+        // if(Azmuth_index < Azmuth_num)
+    	  //  {
+        //    Azmuth_index++;
+    	  //  }
 
         }
+      else
+       {
+        Output = LQG_Controller(headingDiff);
+		    pwm_msg.data=-Output;
+		    pwm_pub.publish(pwm_msg);
+        }
+
       LQG_lastTime=steady_clock::now();
     }
   }
