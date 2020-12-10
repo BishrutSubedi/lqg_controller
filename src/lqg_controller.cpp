@@ -29,9 +29,8 @@ using namespace std::chrono;
 double Setpoint=0, Input, Output;
 //using namespace exploringBB;
 // Set parameters for the LQG cntroller
-double lastW = 0;     // NOT USED
-double lastE = 0;     // NOT USED
-
+double lastW = 0;     
+double lastE = 0;     
 double Kcp = 4.4721;
 double Kcf = 3.1535;
 double Kep = 1.7321;
@@ -118,47 +117,20 @@ int main(int argc, char **argv)
 
   Azmuth_num=sizeof(Azmuth)/sizeof(Azmuth[0]); 
 	cout<<Azmuth_num<<endl;
-
-  //RECREATE THIS FUNCTION AND DO YOUR OWN WAY
-  std::fstream fs;
-  fs.open ("test.txt", std::fstream::in | std::fstream::out | std::fstream::app);
 	
-  if(!fs) {                               // EXIT PROGRAM IF FILE NOT THERE, ADD WARNING ON EXIT
-          cout << "1. Cannot open file. \n";
-          return 1;
-        }
-	
-	fs<<"In exp4The Azmuth[] ={ 120,55,130,80,155,85,165,100,180,135,220,135,190,115,165,115,200,155,100,165,90,155,105,185,140,210,150} and kp=1.1, ki=1.5;"<<endl;
-
 	sleep(2);
 
   cout<< "time_count" << "," << "Output_pwm" <<" ,"<< "raw_angle" <<" ," << "target_angle" << endl; //printing to screen as well
 
 	while (Azmuth_index < Azmuth_num)     //NOTE: THIS LOOP ONLY EXITS AFTER ALL ANGLE TARGET REACHED AND DO NOT WRITE ANYTHING AS WRITING IS AFTER WHILE LOOP FINISHES.
 	{
-		 PI_Motor();  //Azmuth index is incremented in PI_Motor() // fills global variable
+    Lqg_Motor();
+		//PI_Motor();  //Azmuth index is incremented in PI_Motor() // fills global variable
 
-//  Can comment this whole section
-    if(!fs) {
-            cout << "2. Cannot open file.\n"; // here it throws error
-            return 1;
-          }
-
-  // WRITE TO FILE data.txt 1
-  // COMMENT THIS ALL OUT AND TEST FROM TERMINAL FILE ONLY
-    // for(int i=1;i<data_index;i++)
-    // {
-    //   fs<<data[i].during_time<<" "<<data[i].value_pwm<<" "<<data[i].value_heading<<endl;
-    //   //this_thread::sleep_for(std::chrono::milliseconds(100)); //sleep 100ms in this thread
-
-    // }
-
-	} //EN254D WHILE LOOP
+	} //END WHILE LOOP
 
 		pwm_msg.data = 0;    //STOP THE MOTOR
 		pwm_pub.publish(pwm_msg);
-
-		fs.close();   
 
 		return 0;
 }
@@ -199,8 +171,8 @@ void PI_Motor()   //motor control
       else
        {
         Output = PI_Controller(headingDiff);
-	t4 = steady_clock::now();
-	duration<double> time_freq = duration_cast<duration<double>>(t4 - t3);
+	      t4 = steady_clock::now();
+      	duration<double> time_freq = duration_cast<duration<double>>(t4 - t3);
         cout<< time_freq.count() << "," << Output <<" ,"<< Input <<" ," << targetHeading << endl; //printing to screen as well
 
         if (Output > 0)
@@ -275,15 +247,15 @@ void Lqg_Motor()   //motor control
     if (duration_cast<duration<double>>(steady_clock::now()- LQG_lastTime).count()>0.02 ) //decide the loop time 50 hz
     {
       float headingRaw =R_compass.c_heading();   //Get current compass
-//
-		// subscribe com
+
+		  // subscribe com
       //***************
       //**publish compass heading
       //***************
       if(duration_cast<duration<double>>(steady_clock::now()- com_sent_time).count()>0.1)
       {
     	  com_sent_time=steady_clock::now();
-		  com_msg.data=headingRaw;
+		    com_msg.data=headingRaw;
     	  com_pub.publish(com_msg);
       }
       //**************************
@@ -302,7 +274,7 @@ void Lqg_Motor()   //motor control
       }
       //***************
 
-      Input=headingRaw;
+      Input = headingRaw;
       Setpoint = targetHeading;
 
       float headingDiff = Get_headingDiff(Input, Setpoint);// get the small difference between the current heading and desired heading
