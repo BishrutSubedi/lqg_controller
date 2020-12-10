@@ -22,7 +22,7 @@
 #include "sensor_msgs/NavSatFix.h"
 #include <ros/callback_queue.h>
 
-// from remote_initial_Scan_main.cpp
+// Hardware test successful 
 
 using namespace std;
 using namespace std::chrono;
@@ -141,7 +141,6 @@ void setting()
 	R_compass.setting_compass();//setting compass
 	usleep(200000);
 }
-
 
 void PI_Motor()   //motor control
   {
