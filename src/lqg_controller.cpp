@@ -29,12 +29,21 @@ using namespace std::chrono;
 double Setpoint=0, Input, Output;
 //using namespace exploringBB;
 // Set parameters for the LQG cntroller
+//double lastW = 0;     
+//double lastE = 0;     
+//double Kcp = 4.4721;
+//double Kcf = 3.1535;
+//double Kep = 1.7321;  // ke(1)
+//double Kef = 1;	// ke(2)
+//double J = 2;		// 1/J B = [0; 1/J] = [0; b]
+
+// New parameters for LQG controller
 double lastW = 0;     
 double lastE = 0;     
-double Kcp = 4.4721;
-double Kcf = 3.1535;
-double Kep = 1.7321;
-double Kef = 1;
+double Kcp = 3.8730;
+double Kcf = 0.1644;
+double Kep = 1.005;
+double Kef = 4.7193/10000 ;
 double J = 2;
 
 // Set parameters for PI controller
@@ -65,12 +74,12 @@ double offsetTol = 4;
 //int Azmuth[] ={ 135,85,140,90,170,125,195,155,210,165,205,150,200,135,180,125,170,110,165,100,155,85,140,80,135,70,115};//exp7
 
 //Experiment for only one
-int Azmuth[] = {165} ; //exp4
+int Azmuth[] = {20} ; //exp4
 int flag_LQG_motor = 1;
 
 int Azmuth_index = 0;  // IS A GLOBAL VARIABLE
 
-int Azmuth_single = 165; // single Azmuth for LQG test
+int Azmuth_single = 0; // single Azmuth for LQG test
 //***********************************************
 
 void setting();     
